@@ -1,3 +1,5 @@
 .idea
 slic3rWeb.iml
 bin/*
+stl/
+gcode/
