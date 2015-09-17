@@ -9,12 +9,22 @@ import (
     "strings"
     "os/exec"
     "fmt"
+    "encoding/xml"
+    "io/ioutil"
 )
 
 var slic3rPath = "/home/zethra/Downloads/Slic3r/bin/slic3r"
 
+type Config struct {
+    Port int
+    Slic3rPath string
+}
+
+var config = Config{}
+
 func main() {
     //Generate Directories
+
     if _, err := os.Stat("stl"); os.IsNotExist(err) {
         log.Println("Makeing Images Directory")
         os.Mkdir("stl", 0777)
@@ -23,12 +33,40 @@ func main() {
         log.Println("Makeing Scad Directory")
         os.Mkdir("gcode", 0666)
     }
-
+    if _, err := os.Stat("config.xml"); os.IsNotExist(err) {
+        log.Println("Makeing config")
+        config.Port = 8080
+        config.Slic3rPath = "slic3r"
+        xml, err := xml.MarshalIndent(config, "", "    ")
+        if (err != nil) {
+            panic(err)
+            return
+        }
+        err = ioutil.WriteFile("config.xml", xml, 0666)
+        if (err != nil) {
+            panic(err)
+            return
+        }
+    } else {
+        data, err := ioutil.ReadFile("config.xml")
+        if (err != nil) {
+            panic(err)
+            return
+        }
+        if (string(data) == "") {
+            return
+        }
+        err = xml.Unmarshal(data, &config)
+        if (err != nil) {
+            panic(err)
+            return
+        }
+    }
 
     http.HandleFunc("/", handler)
     http.Handle("/gcode/", http.StripPrefix("/gcode/", http.FileServer(http.Dir("gcode"))))
-    http.ListenAndServe(":8080", nil)
-    log.Println("HTTP Server Started")
+    log.Println("HTTP Server Starting on port " + config.Port)
+    http.ListenAndServe(fmt.Sprintf(":%d", config.Port), nil)
 }
 
 func handler(writer http.ResponseWriter, request *http.Request) {
@@ -57,7 +95,7 @@ func handler(writer http.ResponseWriter, request *http.Request) {
     args := fmt.Sprintf(" stl/%s.stl --output gcode/%s.gcode", fileName, fileName)
     wg := new(sync.WaitGroup)
     wg.Add(1)
-    go exe_cmd(slic3rPath + args, wg)
+    go exe_cmd(config.Slic3rPath + args, wg)
     wg.Wait()
     writer.Write([]byte("/gcode/" + fileName + ".gcode"))
 }
