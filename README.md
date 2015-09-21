@@ -1,4 +1,4 @@
-# Slic3r Web Interfcae
+# Slic3r Web Interface
 This is and RESTful api for [Slic3r](http://slic3r.org)
 ##API
 ####Slice file
@@ -16,5 +16,9 @@ Content-Type: application/octet-stream
 
 STL FILE CONTENT GOES HERE
 
+------WebKitFormBoundaryDeC2E3iWbTv1PwMC
+Content-Disposition: form-data; name="SLIC3R ARG NAME"
+
+"SLIC3R ARG VALUE"
 ------WebKitFormBoundaryDeC2E3iWbTv1PwMC--
 </pre>
