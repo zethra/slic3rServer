@@ -22,7 +22,6 @@ var config = Config{}
 
 func main() {
     //Generate Directories
-
     if _, err := os.Stat("stl"); os.IsNotExist(err) {
         log.Println("Makeing Images Directory")
         os.Mkdir("stl", 0777)
@@ -31,6 +30,7 @@ func main() {
         log.Println("Makeing Scad Directory")
         os.Mkdir("gcode", 0666)
     }
+    //Create config file if does not exist
     if _, err := os.Stat("config.xml"); os.IsNotExist(err) {
         log.Println("Makeing config")
         config.Port = 8080
@@ -46,6 +46,7 @@ func main() {
             return
         }
     } else {
+        //Read config file if does exist
         data, err := ioutil.ReadFile("config.xml")
         if (err != nil) {
             panic(err)
@@ -61,6 +62,7 @@ func main() {
         }
     }
 
+    //Start HTTP server
     http.HandleFunc("/", handler)
     http.Handle("/gcode/", http.StripPrefix("/gcode/", http.FileServer(http.Dir("gcode"))))
     log.Printf("HTTP server starting on port :%d\n", config.Port)
@@ -68,12 +70,14 @@ func main() {
 }
 
 func handler(writer http.ResponseWriter, request *http.Request) {
-    if(request.Method == "GET") {
+    //Reject request if it is not a POST request
+    if(request.Method != "POST") {
         http.Error(writer, http.StatusText(400), 400)
         return
     }
+    //Get slic3r args
     request.ParseMultipartForm(32 << 20)
-	var otherArgs string
+    var otherArgs string
 	for key, value := range request.Form {
 		if(len(value) > 0) {
 			otherArgs += fmt.Sprintf(" --%s %s", key, value[0])
@@ -81,6 +85,7 @@ func handler(writer http.ResponseWriter, request *http.Request) {
 			otherArgs += fmt.Sprintf(" --%s", key)
 		}
 	}
+    //Get STL file
     tmpFile, header, err := request.FormFile("file")
     if err != nil {
         log.Println(err)
@@ -98,11 +103,13 @@ func handler(writer http.ResponseWriter, request *http.Request) {
     }
     io.Copy(file, tmpFile)
     file.Close()
+    //Run slic3r with STL file and args
     args := fmt.Sprintf(" stl/%s.stl %s --output gcode/%s.gcode", fileName, otherArgs, fileName)
     wg := new(sync.WaitGroup)
     wg.Add(1)
     go exe_cmd(config.Slic3rPath + args, wg)
     wg.Wait()
+    //Return location of gcode file
     writer.Write([]byte("/gcode/" + fileName + ".gcode"))
 }
 
