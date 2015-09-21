@@ -65,7 +65,7 @@ func main() {
 
     http.HandleFunc("/", handler)
     http.Handle("/gcode/", http.StripPrefix("/gcode/", http.FileServer(http.Dir("gcode"))))
-    log.Println("HTTP Server Starting on port " + config.Port)
+    log.Printf("HTTP server starting on port :%d\n", config.Port)
     http.ListenAndServe(fmt.Sprintf(":%d", config.Port), nil)
 }
 
