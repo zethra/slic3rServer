@@ -13,8 +13,6 @@ import (
     "io/ioutil"
 )
 
-var slic3rPath = "/home/zethra/Downloads/Slic3r/bin/slic3r"
-
 type Config struct {
     Port int
     Slic3rPath string
@@ -75,6 +73,14 @@ func handler(writer http.ResponseWriter, request *http.Request) {
         return
     }
     request.ParseMultipartForm(32 << 20)
+	var otherArgs string
+	for key, value := range request.Form {
+		if(len(value) > 0) {
+			otherArgs += fmt.Sprintf(" --%s %s", key, value[0])
+		} else {
+			otherArgs += fmt.Sprintf(" --%s", key)
+		}
+	}
     tmpFile, header, err := request.FormFile("file")
     if err != nil {
         log.Println(err)
@@ -92,7 +98,7 @@ func handler(writer http.ResponseWriter, request *http.Request) {
     }
     io.Copy(file, tmpFile)
     file.Close()
-    args := fmt.Sprintf(" stl/%s.stl --output gcode/%s.gcode", fileName, fileName)
+    args := fmt.Sprintf(" stl/%s.stl %s --output gcode/%s.gcode", fileName, otherArgs, fileName)
     wg := new(sync.WaitGroup)
     wg.Add(1)
     go exe_cmd(config.Slic3rPath + args, wg)
