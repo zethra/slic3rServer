@@ -1,5 +1,7 @@
 .idea
 slic3rWeb.iml
+slic3rServer.iml
 bin/*
 stl/
 gcode/
+config.xml
