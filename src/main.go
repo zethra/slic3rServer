@@ -23,16 +23,16 @@ var config = Config{}
 func main() {
     //Generate Directories
     if _, err := os.Stat("stl"); os.IsNotExist(err) {
-        log.Println("Makeing Images Directory")
+        log.Println("Making Images Directory")
         os.Mkdir("stl", 0777)
     }
     if _, err := os.Stat("gcode"); os.IsNotExist(err) {
-        log.Println("Makeing Scad Directory")
+        log.Println("Making Scad Directory")
         os.Mkdir("gcode", 0666)
     }
     //Create config file if does not exist
     if _, err := os.Stat("config.xml"); os.IsNotExist(err) {
-        log.Println("Makeing config")
+        log.Println("Making config")
         config.Port = 8080
         config.Slic3rPath = "slic3r"
         xml, err := xml.MarshalIndent(config, "", "    ")
