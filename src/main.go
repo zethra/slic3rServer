@@ -10,6 +10,7 @@ import (
     "os/exec"
     "fmt"
     "encoding/xml"
+    "encoding/json"
     "io/ioutil"
 )
 
@@ -63,13 +64,50 @@ func main() {
     }
 
     //Start HTTP server
-    http.HandleFunc("/", handler)
+    http.Handle("/", http.FileServer(http.Dir("web")))
+    http.Handle("/stl/", http.StripPrefix("/stl/", http.FileServer(http.Dir("stl"))))
     http.Handle("/gcode/", http.StripPrefix("/gcode/", http.FileServer(http.Dir("gcode"))))
+    http.HandleFunc("/api/uploadAndSlice", uploadAndSlice)
+    http.HandleFunc("/api/stl/list", getStls)
+    http.HandleFunc("/api/gcode/list", getGcodes)
     log.Printf("HTTP server starting on port :%d\n", config.Port)
     http.ListenAndServe(fmt.Sprintf(":%d", config.Port), nil)
 }
 
-func handler(writer http.ResponseWriter, request *http.Request) {
+func getStls(writer http.ResponseWriter, request *http.Request) {
+    var fileNames []string
+    files, err := ioutil.ReadDir("./stl")
+    if(err != nil) {
+        http.Error(writer, http.StatusText(400), 400)
+    }
+    for _, f := range files {
+            fileNames = append(fileNames, f.Name())
+    }
+    json, err := json.MarshalIndent(fileNames, "", "    ")
+    if(err != nil) {
+        http.Error(writer, http.StatusText(400), 400)
+    }
+    writer.Write(json)
+}
+
+func getGcodes(writer http.ResponseWriter, request *http.Request) {
+    var fileNames []string
+    files, err := ioutil.ReadDir("./gcode")
+    if(err != nil) {
+        http.Error(writer, http.StatusText(400), 400)
+    }
+    for _, f := range files {
+            fileNames = append(fileNames, f.Name())
+    }
+    json, err := json.MarshalIndent(fileNames, "", "    ")
+    if(err != nil) {
+        http.Error(writer, http.StatusText(400), 400)
+    }
+    writer.Write(json)
+}
+    
+
+func uploadAndSlice(writer http.ResponseWriter, request *http.Request) {
     //Reject request if it is not a POST request
     if(request.Method != "POST") {
         http.Error(writer, http.StatusText(400), 400)
@@ -95,6 +133,7 @@ func handler(writer http.ResponseWriter, request *http.Request) {
     defer tmpFile.Close()
     log.Println(header.Header)
     fileName := header.Filename[:(len(header.Filename) - 4)]
+    //fileName := header.Filename
     file, err := os.OpenFile("stl/" + header.Filename, os.O_WRONLY|os.O_CREATE, 0666)
     if err != nil {
         log.Println(err)
@@ -104,7 +143,7 @@ func handler(writer http.ResponseWriter, request *http.Request) {
     io.Copy(file, tmpFile)
     file.Close()
     //Run slic3r with STL file and args
-    args := fmt.Sprintf(" stl/%s.stl %s --output gcode/%s.gcode", fileName, otherArgs, fileName)
+    args := fmt.Sprintf(" \"stl/%s\" %s --output \"gcode/%s.gcode\"", header.Filename, otherArgs, fileName)
     wg := new(sync.WaitGroup)
     wg.Add(1)
     go exe_cmd(config.Slic3rPath + args, wg)
