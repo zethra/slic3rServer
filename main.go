@@ -11,6 +11,7 @@ import (
     "fmt"
     "encoding/xml"
     "io/ioutil"
+    "encoding/json"
 )
 
 type Config struct {
@@ -63,13 +64,30 @@ func main() {
     }
 
     //Start HTTP server
-    http.HandleFunc("/", handler)
+    http.HandleFunc("/", sliceHandler)
     http.Handle("/gcode/", http.StripPrefix("/gcode/", http.FileServer(http.Dir("gcode"))))
+    http.Handle("/stl/", http.StripPrefix("/stl/", http.FileServer(http.Dir("stl"))))
+    http.HandleFunc("/gcode", FileListHandler)
+    http.HandleFunc("/stl", FileListHandler)
     log.Printf("HTTP server starting on port :%d\n", config.Port)
     http.ListenAndServe(fmt.Sprintf(":%d", config.Port), nil)
 }
 
-func handler(writer http.ResponseWriter, request *http.Request) {
+func FileListHandler(writer http.ResponseWriter, request *http.Request)  {
+    files, err := ioutil.ReadDir("." + request.URL.String())
+    if(err != nil) {
+        http.Error(writer, err.Error(), 500)
+        return
+    }
+    var fileList []string
+    for _, file := range files {
+        fileList = append(fileList, file.Name())
+    }
+    data, err := json.MarshalIndent(fileList, "", "    ")
+    writer.Write(data)
+}
+
+func sliceHandler(writer http.ResponseWriter, request *http.Request) {
     //Reject request if it is not a POST request
     if(request.Method != "POST") {
         http.Error(writer, http.StatusText(400), 400)
