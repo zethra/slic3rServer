@@ -22,3 +22,35 @@ Content-Disposition: form-data; name="SLIC3R ARG NAME"
 "SLIC3R ARG VALUE"
 ------WebKitFormBoundaryDeC2E3iWbTv1PwMC--
 </pre>
+
+####Get file list
+
+stl
+
+<pre>
+GET /stl HTTP/1.1
+Host: example.com
+</pre>
+
+gcode
+
+<pre>
+GET /gcode HTTP/1.1
+Host: example.com
+</pre>
+
+####Dowload sliced files
+
+stl
+
+<pre>
+GET /stl/filename.stl HTTP/1.1
+Host: example.com
+</pre>
+
+gcode
+
+<pre>
+GET /gcode/filename.gcode HTTP/1.1
+Host: example.com
+</pre>
