@@ -1,5 +1,12 @@
 # Slic3r Web Interface
 This is and RESTful api for [Slic3r](http://slic3r.org)
+
+##Install
+ - Install golang
+ - Run `go get github.com/zethra/slic3rServer`
+ - Run slic3r server binary
+ - Make sure the slic3r binary is in your path
+
 ##API
 ####Slice file
 
