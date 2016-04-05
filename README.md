@@ -2,10 +2,15 @@
 This is and RESTful api for [Slic3r](http://slic3r.org)
 
 ## Install
- - Install golang
+ - Install the [go compiler](http://golang.org) and set up the go environment
  - Run `go get github.com/zethra/slic3rServer`
- - Run slic3r server binary
- - Make sure the slic3r binary is in your path
+ - Run `slic3rServer` binary
+
+## Configuration
+The first time slic3r server runs it generates a config.xml file where various config options can be set
+
+ - Port: the port slic3r server will bind to - 7766 be default
+ - Slic3rPath: the path to the slic3r binary - slic3r (in system path) be default
 
 ## API
 ### Slice file
