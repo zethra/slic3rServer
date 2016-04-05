@@ -9,15 +9,19 @@ This is and RESTful api for [Slic3r](http://slic3r.org)
 ## Configuration
 The first time slic3r server runs it generates a config.xml file where various config options can be set
 
- - Port: the port slic3r server will bind to - 7766 be default
- - Slic3rPath: the path to the slic3r binary - slic3r (in system path) be default
+ - port: the port slic3r server will bind to - 7766 be default
+ - slic3rPath: the path to the slic3r binary - slic3r (in system path) be default
+
+## Flags
+ - All for Slic3r Server's config options con be overridden by setting a flag of the same name to the desired value
+ - If the debug flag is set Slic3r Server will output more information about what it's doing
 
 ## API
 ### Slice file
 To slice a file send a multipart post request to /slice with the stl file included.  The server will then return the url of the gcode file, which can be downloaded.  
 #### Other Parameters
  - wait - if set to true server will wait until slic3r is done to respond
- - callback - if set, server will send a post request containing to gcode file url to the url provided
+ - callback - this parameter has two parts spereated by a comma, a type and a url.  If the type is url Slic3r Server will send a post request containing to gcode file url to the url provided when slic3r is done. If the type is file Slic3r Server will send a multipart post request containing to gcode file to the url provided when slic3r is done.  Note Slic3r Server will not return an error to the client if callback fails unless wait is set to true
  - Any other parameters set will be used as parameters for slic3r
  
 #### Sample HTTP Request
@@ -48,7 +52,7 @@ true
 ----WebKitFormBoundary7MA4YWxkTrZu0gW
 Content-Disposition: form-data; name="callback"
 
-http://localhost:8080/callback
+url,http://localhost:8080/callback
 ----WebKitFormBoundary7MA4YWxkTrZu0gW
 </pre>
 Resulting command `slic3r stl/test.stl --repair --layer-height 0.2 --output gcode/test.gcode`
