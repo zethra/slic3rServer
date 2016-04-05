@@ -35,7 +35,7 @@ func main() {
 	//Create config file if does not exist
 	if _, err := os.Stat("config.xml"); os.IsNotExist(err) {
 		log.Println("Making config")
-		config.Port = 8080
+		config.Port = 7766
 		config.Slic3rPath = "slic3r"
 		xml, err := xml.MarshalIndent(config, "", "    ")
 		if (err != nil) {

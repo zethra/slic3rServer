@@ -18,7 +18,7 @@ To slice a file send a multipart post request to /slice with the stl file includ
 #### Sample HTTP Request
 <pre>
 POST /slice HTTP/1.1
-Host: localhost:8080
+Host: localhost:7766
 Cache-Control: no-cache
 Postman-Token: da439a4f-572d-5642-4ebd-80d765450dd8
 Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
@@ -43,7 +43,7 @@ true
 ----WebKitFormBoundary7MA4YWxkTrZu0gW
 Content-Disposition: form-data; name="callback"
 
-http://localhost:8081/callback
+http://localhost:8080/callback
 ----WebKitFormBoundary7MA4YWxkTrZu0gW
 </pre>
 Resulting command `slic3r stl/test.stl --repair --layer-height 0.2 --output gcode/test.gcode`
@@ -54,12 +54,12 @@ Send a get request to /stl or /gcode
 #### Sample HTTP requests
 <pre>
 GET /stl HTTP/1.1
-Host: example.com
+Host: localhost:7766
 </pre>
 
 <pre>
 GET /gcode HTTP/1.1
-Host: example.com
+Host: localhost:7766
 </pre>
 
 #### Download files
@@ -67,10 +67,10 @@ Send a get request to /stl/filename.stl or /gcode/filename.gcode
 #### Sample HTTP requests
 <pre>
 GET /stl/filename.stl HTTP/1.1
-Host: example.com
+Host: localhost:7766
 </pre>
 
 <pre>
 GET /gcode/filename.gcode HTTP/1.1
-Host: example.com
+Host: localhost:7766
 </pre>
