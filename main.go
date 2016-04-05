@@ -64,7 +64,7 @@ func main() {
     }
 
     //Start HTTP server
-    http.HandleFunc("/", sliceHandler)
+    http.HandleFunc("/slice", sliceHandler)
     http.Handle("/gcode/", http.StripPrefix("/gcode/", http.FileServer(http.Dir("gcode"))))
     http.Handle("/stl/", http.StripPrefix("/stl/", http.FileServer(http.Dir("stl"))))
     http.HandleFunc("/gcode", FileListHandler)
@@ -90,7 +90,7 @@ func FileListHandler(writer http.ResponseWriter, request *http.Request)  {
 func sliceHandler(writer http.ResponseWriter, request *http.Request) {
     //Reject request if it is not a POST request
     if(request.Method != "POST") {
-        http.Error(writer, http.StatusText(400), 400)
+        http.Error(writer, "Request is not a POST request", 400)
         return
     }
     //Get slic3r args
@@ -107,7 +107,7 @@ func sliceHandler(writer http.ResponseWriter, request *http.Request) {
     tmpFile, header, err := request.FormFile("file")
     if err != nil {
         log.Println(err)
-        http.Error(writer, http.StatusText(400), 400)
+        http.Error(writer, "Could not parse file form request", 400)
         return
     }
     defer tmpFile.Close()
@@ -116,7 +116,7 @@ func sliceHandler(writer http.ResponseWriter, request *http.Request) {
     file, err := os.OpenFile("stl/" + header.Filename, os.O_WRONLY|os.O_CREATE, 0666)
     if err != nil {
         log.Println(err)
-        http.Error(writer, http.StatusText(500), 500)
+        http.Error(writer, "Could not open file: stl/" + header.Filename, 500)
         return
     }
     io.Copy(file, tmpFile)

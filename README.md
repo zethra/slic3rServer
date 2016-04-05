@@ -10,10 +10,10 @@ This is and RESTful api for [Slic3r](http://slic3r.org)
 ##API
 ####Slice file
 
-To slice a file send a multipart post request to / with the stl file included.  The server will then return the url of the gcode file, which can be downloaded.  Note the http server will not respond until slic3r is done, so make sure you client does not time out.  Additional any other form data included will be used as arguments when running slic3r.  
+To slice a file send a multipart post request to /slice with the stl file included.  The server will then return the url of the gcode file, which can be downloaded.  Note the http server will not respond until slic3r is done, so make sure you client does not time out.  Additional any other form data included will be used as arguments when running slic3r.  
 
 <pre>
-POST / HTTP/1.1
+POST /slice HTTP/1.1
 Host: example.com
 Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryDeC2E3iWbTv1PwMC
 
