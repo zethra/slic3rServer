@@ -14,6 +14,7 @@ To slice a file send a multipart post request to /slice with the stl file includ
  - wait - if set to true server will wait until slic3r is done to respond
  - callback - if set, server will send a post request containing to gcode file url to the url provided
  - Any other parameters set will be used as parameters for slic3r
+ 
 #### Sample HTTP Request
 <pre>
 POST /slice HTTP/1.1
@@ -49,6 +50,7 @@ Resulting command `slic3r stl/test.stl --repair --layer-height 0.2 --output gcod
 
 ### Get a list of file son the server
 Send a get request to /stl or /gcode
+
 #### Sample HTTP requests
 <pre>
 GET /stl HTTP/1.1
