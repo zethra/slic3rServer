@@ -58,7 +58,7 @@ url,http://localhost:8080/callback
 Resulting command `slic3r stl/test.stl --repair --layer-height 0.2 --output gcode/test.gcode`
 
 ### Get a list of file son the server
-Send a get request to /stl or /gcode
+Send a GET request to /stl or /gcode
 
 #### Sample HTTP requests
 <pre>
@@ -72,7 +72,7 @@ Host: localhost:7766
 </pre>
 
 #### Download files
-Send a get request to /stl/filename.stl or /gcode/filename.gcode
+Send a GET request to /stl/filename.stl or /gcode/filename.gcode
 #### Sample HTTP requests
 <pre>
 GET /stl/filename.stl HTTP/1.1
@@ -81,5 +81,30 @@ Host: localhost:7766
 
 <pre>
 GET /gcode/filename.gcode HTTP/1.1
+Host: localhost:7766
+</pre>
+
+#### Delete file
+Send a DELETE request to the url of the file you want to delete
+<pre>
+DELETE /stl/test.stl HTTP/1.1
+Host: localhost:7766
+</pre>
+
+<pre>
+DELETE /gcode/test.gcode HTTP/1.1
+Host: localhost:7766
+</pre>
+
+
+### Clear all files
+Send a delete request to `/stl` or `/gcode` to detele all of those repective files
+<pre>
+DELETE /stl HTTP/1.1
+Host: localhost:7766
+</pre>
+
+<pre>
+DELETE /gcode HTTP/1.1
 Host: localhost:7766
 </pre>
