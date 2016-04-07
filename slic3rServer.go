@@ -17,6 +17,8 @@ import (
 	"path/filepath"
 	"mime/multipart"
 	"net/url"
+
+	"github.com/gorilla/mux"
 )
 
 type Config struct {
@@ -88,33 +90,51 @@ func main() {
 		config.Slic3rPath = *slic3rPathFlag
 	}
 	//Start HTTP server
-	http.HandleFunc("/slice", sliceHandler)
-	http.Handle("/gcode/", http.StripPrefix("/gcode/", http.FileServer(http.Dir("gcode"))))
-	http.Handle("/stl/", http.StripPrefix("/stl/", http.FileServer(http.Dir("stl"))))
-	http.HandleFunc("/gcode", fileListHandler)
-	http.HandleFunc("/stl", fileListHandler)
+	router := mux.NewRouter()
+	router.HandleFunc("/slice", sliceHandler).Methods("POST")
+	router.Handle("/gcode/", http.StripPrefix("/gcode/", http.FileServer(http.Dir("gcode")))).Methods("GET")
+	router.Handle("/stl/", http.StripPrefix("/stl/", http.FileServer(http.Dir("stl")))).Methods("GET")
+	router.HandleFunc("/{stl | gcode}", fileListHandler).Methods("GET")
+	router.HandleFunc("/{stl | gcode}", clearFilesHandler).Methods("DELETE")
+	http.Handle("/", router)
 	log.Printf("Slic3r Server binding to port: %d\n", config.Port)
 	http.ListenAndServe(fmt.Sprintf(":%d", config.Port), nil)
 }
 
-
-
 func fileListHandler(writer http.ResponseWriter, request *http.Request) {
-	if(request.Method == "GET") {
-		files, err := ioutil.ReadDir("." + request.URL.String())
-		if (err != nil) {
+	files, err := ioutil.ReadDir("." + request.URL.String())
+	if (err != nil) {
+		http.Error(writer, err.Error(), 500)
+		return
+	}
+	var fileList []string
+	for _, file := range files {
+		fileList = append(fileList, file.Name())
+	}
+	data, err := json.MarshalIndent(fileList, "", "    ")
+	writer.Write(data)
+}
+
+func clearFilesHandler(writer http.ResponseWriter, request *http.Request) {
+	d, err := os.Open("." + request.URL.String())
+	if err != nil {
+		http.Error(writer, err.Error(), 500)
+		return
+	}
+	defer d.Close()
+	names, err := d.Readdirnames(-1)
+	if err != nil {
+		http.Error(writer, err.Error(), 500)
+		return
+	}
+	for _, name := range names {
+		err = os.RemoveAll(filepath.Join("." + request.URL.String(), name))
+		if err != nil {
 			http.Error(writer, err.Error(), 500)
 			return
 		}
-		var fileList []string
-		for _, file := range files {
-			fileList = append(fileList, file.Name())
-		}
-		data, err := json.MarshalIndent(fileList, "", "    ")
-		writer.Write(data)
-	} else if (request.Method == "DELETE") {
-
 	}
+	writer.WriteHeader(204)
 }
 
 func sliceHandler(writer http.ResponseWriter, request *http.Request) {
