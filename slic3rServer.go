@@ -92,10 +92,11 @@ func main() {
 	//Start HTTP server
 	router := mux.NewRouter()
 	router.HandleFunc("/slice", sliceHandler).Methods("POST")
-	router.Handle("/gcode/", http.StripPrefix("/gcode/", http.FileServer(http.Dir("gcode")))).Methods("GET")
-	router.Handle("/stl/", http.StripPrefix("/stl/", http.FileServer(http.Dir("stl")))).Methods("GET")
-	router.HandleFunc("/{stl | gcode}", fileListHandler).Methods("GET")
-	router.HandleFunc("/{stl | gcode}", clearFilesHandler).Methods("DELETE")
+	router.Handle("/gcode/{name}", http.StripPrefix("/gcode/", http.FileServer(http.Dir("gcode")))).Methods("GET")
+	router.Handle("/stl/{name}", http.StripPrefix("/stl/", http.FileServer(http.Dir("stl")))).Methods("GET")
+	router.HandleFunc("/{stl|gcode}", fileListHandler).Methods("GET")
+	router.HandleFunc("/{stl|gcode}", clearFilesHandler).Methods("DELETE")
+	router.HandleFunc("/{type:stl|gcode}/{name}", deleteFileHandler).Methods("DELETE")
 	http.Handle("/", router)
 	log.Printf("Slic3r Server binding to port: %d\n", config.Port)
 	http.ListenAndServe(fmt.Sprintf(":%d", config.Port), nil)
@@ -115,22 +116,37 @@ func fileListHandler(writer http.ResponseWriter, request *http.Request) {
 	writer.Write(data)
 }
 
+func deleteFileHandler(writer http.ResponseWriter, request *http.Request)  {
+	vars := mux.Vars(request)
+	fileType := vars["type"]
+	fileName := vars["name"]
+	if err := os.Remove("./" + fileType + "/" + fileName); err != nil {
+		log.Println(err)
+		http.Error(writer, "Failed to delete file", 500)
+		return
+	}
+	writer.WriteHeader(204)
+}
+
 func clearFilesHandler(writer http.ResponseWriter, request *http.Request) {
 	d, err := os.Open("." + request.URL.String())
 	if err != nil {
-		http.Error(writer, err.Error(), 500)
+		log.Println(err)
+		http.Error(writer, "Failed to delete files", 500)
 		return
 	}
 	defer d.Close()
 	names, err := d.Readdirnames(-1)
 	if err != nil {
-		http.Error(writer, err.Error(), 500)
+		log.Println(err)
+		http.Error(writer, "Failed to delete files", 500)
 		return
 	}
 	for _, name := range names {
 		err = os.RemoveAll(filepath.Join("." + request.URL.String(), name))
 		if err != nil {
-			http.Error(writer, err.Error(), 500)
+			log.Println(err)
+			http.Error(writer, "Failed to delete files", 500)
 			return
 		}
 	}
