@@ -44,49 +44,45 @@ func main() {
 		os.Mkdir("stl", 0777)
 	}
 	if _, err := os.Stat("gcode"); os.IsNotExist(err) {
-		if (*debugFlag) {
+		if *debugFlag {
 			log.Println("Making Gcode Directory")
 		}
 		os.Mkdir("gcode", 0777)
 	}
 	//Create config file if does not exist
 	if _, err := os.Stat("config.xml"); os.IsNotExist(err) {
-		if (*debugFlag) {
+		if *debugFlag {
 			log.Println("Making config")
 		}
 		config.Port = 7766
 		config.Slic3rPath = "slic3r"
 		xml, err := xml.MarshalIndent(config, "", "    ")
-		if (err != nil) {
+		if err != nil {
 			panic(err)
 			return
 		}
 		err = ioutil.WriteFile("config.xml", xml, 0666)
-		if (err != nil) {
+		if err != nil {
 			panic(err)
 			return
 		}
 	} else {
 		//Read config file if does exist
 		data, err := ioutil.ReadFile("config.xml")
-		if (err != nil) {
+		if err != nil || string(data) == "" {
 			panic(err)
 			return
 		}
-		if (string(data) == "") {
-			return
-		}
-		err = xml.Unmarshal(data, &config)
-		if (err != nil) {
+		if err = xml.Unmarshal(data, &config); err != nil {
 			panic(err)
 			return
 		}
 	}
 	//Override config with flags if set
-	if (*portFlag != 0) {
+	if *portFlag != 0 {
 		config.Port = *portFlag
 	}
-	if (*slic3rPathFlag != "") {
+	if *slic3rPathFlag != "" {
 		config.Slic3rPath = *slic3rPathFlag
 	}
 	//Start HTTP server
@@ -104,8 +100,9 @@ func main() {
 
 func fileListHandler(writer http.ResponseWriter, request *http.Request) {
 	files, err := ioutil.ReadDir("." + request.URL.String())
-	if (err != nil) {
-		http.Error(writer, err.Error(), 500)
+	if err != nil {
+		http.Error(writer, "Could not get file list", 500)
+		log.Println(err)
 		return
 	}
 	var fileList []string
@@ -113,6 +110,11 @@ func fileListHandler(writer http.ResponseWriter, request *http.Request) {
 		fileList = append(fileList, file.Name())
 	}
 	data, err := json.MarshalIndent(fileList, "", "    ")
+	if err != nil {
+		http.Error(writer, "Could not get file list", 500)
+		log.Println(err)
+		return
+	}
 	writer.Write(data)
 }
 
@@ -155,7 +157,7 @@ func clearFilesHandler(writer http.ResponseWriter, request *http.Request) {
 
 func sliceHandler(writer http.ResponseWriter, request *http.Request) {
 	//Reject request if it is not a POST request
-	if (request.Method != "POST") {
+	if request.Method != "POST" {
 		http.Error(writer, "Request is not a POST request", 400)
 		return
 	}
@@ -164,15 +166,15 @@ func sliceHandler(writer http.ResponseWriter, request *http.Request) {
 	var otherArgs, callbackType, callbackURL string
 	var wait bool
 	for key, value := range request.Form {
-		if (key == "callback" && len(value) > 0) {
+		if key == "callback" && len(value) > 0 {
 			tmp := strings.Split(value[0], ",")
 			callbackType = tmp[0]
 			callbackURL = tmp[1]
-		} else if (key == "wait" && len(value) > 0) {
-			if (value[0] == "true") {
+		} else if key == "wait" && len(value) > 0 {
+			if value[0] == "true" {
 				wait = true
 			}
-			if (value[0] != "true" && value[0] != "false") {
+			if value[0] != "true" && value[0] != "false" {
 				http.Error(writer, "Invalid value given for wait", 400)
 				return
 			}
