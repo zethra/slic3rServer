@@ -131,7 +131,7 @@ func fileListHandler(writer http.ResponseWriter, request *http.Request) {
 }
 
 func deleteFileHandler(writer http.ResponseWriter, request *http.Request) {
-	vars := mux.Vars(request)
+	vars := getVars(request)
 	fileType := vars["type"]
 	fileName := vars["name"]
 	if err := os.Remove("./" + fileType + "/" + fileName); err != nil {
@@ -342,3 +342,6 @@ func exe_cmd(cmd string, wg *sync.WaitGroup) {
 	wg.Done()
 }
 
+var getVars = func(request *http.Request) map[string]string {
+	return mux.Vars(request)
+}
