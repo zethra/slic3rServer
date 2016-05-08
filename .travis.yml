@@ -2,3 +2,11 @@ language: go
 
 go:
   - 1.6
+  
+before_install:
+  - wget http://dl.slic3r.org/linux/slic3r-linux-x86_64-1-2-9-stable.tar.gz -O /tmp/slic3r.tar.gz
+  - tar -vxf /tmp/slic3r.tar.gz
+  - export PATH=$PATH:$PWD/Slic3r/bin/
+  
+install:
+  - go get github.com/gorilla/mux
