@@ -36,16 +36,17 @@ func main() {
 	log.Println("Starting Slic3r Server")
 	//Parse flags
 	flag.Parse()
-	server := NewServer()
-	if server == nil {
-		panic("Server creation failed")
+	err := SetUp()
+	if err != nil {
+		panic(err)
 	}
+	server := NewServer()
 	http.Handle("/", server)
 	log.Printf("Slic3r Server binding to port: %d\n", config.Port)
 	http.ListenAndServe(fmt.Sprintf(":%d", config.Port), nil)
 }
 
-func NewServer() *mux.Router{
+func SetUp() error{
 	//Generate Directories
 	if _, err := os.Stat("stl"); os.IsNotExist(err) {
 		if (*debugFlag) {
@@ -68,24 +69,20 @@ func NewServer() *mux.Router{
 		config.Slic3rPath = "slic3r"
 		xml, err := xml.MarshalIndent(config, "", "    ")
 		if err != nil {
-			panic(err)
-			return nil
+			return err
 		}
 		err = ioutil.WriteFile("config.xml", xml, 0666)
 		if err != nil {
-			panic(err)
-			return nil
+			return err
 		}
 	} else {
 		//Read config file if does exist
 		data, err := ioutil.ReadFile("config.xml")
 		if err != nil || string(data) == "" {
-			panic(err)
-			return nil
+			return err
 		}
 		if err = xml.Unmarshal(data, &config); err != nil {
-			panic(err)
-			return nil
+			return err
 		}
 		if *debugFlag {
 			log.Println(config)
@@ -98,7 +95,10 @@ func NewServer() *mux.Router{
 	if *slic3rPathFlag != "" {
 		config.Slic3rPath = *slic3rPathFlag
 	}
+	return nil
+}
 
+func NewServer() *mux.Router{
 	//Start HTTP server
 	router := mux.NewRouter()
 	router.HandleFunc("/slice", sliceHandler).Methods("POST")
@@ -107,7 +107,6 @@ func NewServer() *mux.Router{
 	router.HandleFunc("/{stl|gcode}", fileListHandler).Methods("GET")
 	router.HandleFunc("/{stl|gcode}", clearFilesHandler).Methods("DELETE")
 	router.HandleFunc("/{type:stl|gcode}/{name}", deleteFileHandler).Methods("DELETE")
-
 	return router
 }
 
