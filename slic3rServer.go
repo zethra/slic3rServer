@@ -36,6 +36,16 @@ func main() {
 	log.Println("Starting Slic3r Server")
 	//Parse flags
 	flag.Parse()
+	server := NewServer()
+	if server == nil {
+		panic("Server creation failed")
+	}
+	http.Handle("/", server)
+	log.Printf("Slic3r Server binding to port: %d\n", config.Port)
+	http.ListenAndServe(fmt.Sprintf(":%d", config.Port), nil)
+}
+
+func NewServer() *mux.Router{
 	//Generate Directories
 	if _, err := os.Stat("stl"); os.IsNotExist(err) {
 		if (*debugFlag) {
@@ -59,23 +69,26 @@ func main() {
 		xml, err := xml.MarshalIndent(config, "", "    ")
 		if err != nil {
 			panic(err)
-			return
+			return nil
 		}
 		err = ioutil.WriteFile("config.xml", xml, 0666)
 		if err != nil {
 			panic(err)
-			return
+			return nil
 		}
 	} else {
 		//Read config file if does exist
 		data, err := ioutil.ReadFile("config.xml")
 		if err != nil || string(data) == "" {
 			panic(err)
-			return
+			return nil
 		}
 		if err = xml.Unmarshal(data, &config); err != nil {
 			panic(err)
-			return
+			return nil
+		}
+		if *debugFlag {
+			log.Println(config)
 		}
 	}
 	//Override config with flags if set
@@ -85,6 +98,7 @@ func main() {
 	if *slic3rPathFlag != "" {
 		config.Slic3rPath = *slic3rPathFlag
 	}
+
 	//Start HTTP server
 	router := mux.NewRouter()
 	router.HandleFunc("/slice", sliceHandler).Methods("POST")
@@ -93,9 +107,8 @@ func main() {
 	router.HandleFunc("/{stl|gcode}", fileListHandler).Methods("GET")
 	router.HandleFunc("/{stl|gcode}", clearFilesHandler).Methods("DELETE")
 	router.HandleFunc("/{type:stl|gcode}/{name}", deleteFileHandler).Methods("DELETE")
-	http.Handle("/", router)
-	log.Printf("Slic3r Server binding to port: %d\n", config.Port)
-	http.ListenAndServe(fmt.Sprintf(":%d", config.Port), nil)
+
+	return router
 }
 
 func fileListHandler(writer http.ResponseWriter, request *http.Request) {
@@ -118,7 +131,7 @@ func fileListHandler(writer http.ResponseWriter, request *http.Request) {
 	writer.Write(data)
 }
 
-func deleteFileHandler(writer http.ResponseWriter, request *http.Request)  {
+func deleteFileHandler(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 	fileType := vars["type"]
 	fileName := vars["name"]
