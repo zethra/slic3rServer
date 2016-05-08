@@ -11,7 +11,7 @@ import (
 func TestSetUp(t *testing.T)  {
 	err := SetUp()
 	if(err != nil) {
-		t.Fatalf("Setup fialed with error: %v", err.Error())
+		t.Fatalf("Setup failed with error: %v", err.Error())
 	}
 }
 
@@ -45,7 +45,7 @@ func TestFileList(test *testing.T) {
 func TestDeleteFile(test *testing.T) {
 	err := SetUp()
 	if err != nil {
-		test.Fatalf("Setup fialed with error: %v", err.Error())
+		test.Fatalf("Setup failed with error: %v", err.Error())
 	}
 
 	_, err = os.Create("./stl/test.stl")
@@ -89,4 +89,53 @@ func TestDeleteFile(test *testing.T) {
 		test.Error("Gcode file was not deleted")
 	}
 	getVars = _getVars
+}
+
+func TestClearFiles(test *testing.T) {
+	err := SetUp()
+	if err != nil {
+		test.Fatalf("Setup failed with error: %v", err.Error())
+	}
+
+	_, err = os.Create("./stl/test.stl")
+	if err != nil {
+		test.Errorf("Failed to creat test stl file: %v", err)
+	}
+	_, err = os.Create("./stl/test2.stl")
+	if err != nil {
+		test.Errorf("Failed to creat test stl file: %v", err)
+	}
+	request, _ := http.NewRequest("DELETE", "/stl", nil)
+	writer := httptest.NewRecorder()
+	clearFilesHandler(writer, request)
+	if writer.Code != http.StatusNoContent {
+		test.Errorf("File list didn't return NoContent, returned: %v", writer.Code)
+	}
+	if _, err := os.Stat("./stl/test.stl"); err == nil {
+		test.Error("STL file was not deleted")
+	}
+	if _, err := os.Stat("./stl/test2.stl"); err == nil {
+		test.Error("STL file was not deleted")
+	}
+
+	_, err = os.Create("./gcode/test.gcode")
+	if err != nil {
+		test.Errorf("Failed to creat test gcode file: %v", err)
+	}
+	_, err = os.Create("./gcode/test2.gcode")
+	if err != nil {
+		test.Errorf("Failed to creat test gcode file: %v", err)
+	}
+	request, _ = http.NewRequest("DELETE", "/gcode", nil)
+	writer = httptest.NewRecorder()
+	clearFilesHandler(writer, request)
+	if writer.Code != http.StatusNoContent {
+		test.Errorf("File list didn't return NoContent, returned: %v", writer.Code)
+	}
+	if _, err := os.Stat("./gcode/test.gcode"); err == nil {
+		test.Error("Gcode file was not deleted")
+	}
+	if _, err := os.Stat("./gcode/test2.gcode"); err == nil {
+		test.Error("Gcode file was not deleted")
+	}
 }
