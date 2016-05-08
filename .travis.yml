@@ -2,6 +2,7 @@ language: go
 
 go:
   - 1.6
+  - 1.5
   
 before_install:
   - wget http://dl.slic3r.org/linux/slic3r-linux-x86_64-1-2-9-stable.tar.gz -O /tmp/slic3r.tar.gz
