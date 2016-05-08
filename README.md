@@ -57,7 +57,7 @@ url,http://localhost:8080/callback
 </pre>
 Resulting command `slic3r stl/test.stl --repair --layer-height 0.2 --output gcode/test.gcode`
 
-### Get a list of file son the server
+### Get a list of files on the server
 Send a GET request to /stl or /gcode
 
 #### Sample HTTP requests
