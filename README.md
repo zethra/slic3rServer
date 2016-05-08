@@ -1,4 +1,4 @@
-# Slic3r Web Interface
+# Slic3r Web Interface [![Build Status](https://travis-ci.org/zethra/slic3rServer.svg?branch=master)](https://travis-ci.org/zethra/slic3rServer)
 This is and RESTful api for [Slic3r](http://slic3r.org)
 
 ## Install
