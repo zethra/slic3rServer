@@ -11,19 +11,21 @@ import (
 	"path/filepath"
 	"io"
 	"time"
+	"errors"
 )
 
-func TestSetUp(t *testing.T)  {
-	err := SetUp()
-	if(err != nil) {
-		t.Fatalf("Setup failed with error: %v", err.Error())
+func TestSetUp(test *testing.T) {
+	if err := SetUp(); err != nil {
+		test.Fatalf("Setup failed with error: %v", err.Error())
+	}
+	if err := CleanUp(); err != nil {
+		test.Error(err)
 	}
 }
 
 func TestFileList(test *testing.T) {
-	err := SetUp()
-	if(err != nil) {
-		test.Fatalf("Setup fialed with error: %v", err.Error())
+	if err := SetUp(); err != nil {
+		test.Fatalf("Setup failed with error: %v", err.Error())
 	}
 	request, _ := http.NewRequest("GET", "/stl", nil)
 	writer := httptest.NewRecorder()
@@ -38,23 +40,28 @@ func TestFileList(test *testing.T) {
 	if writer.Code != http.StatusOK {
 		test.Errorf("File list didn't return OK, returned: %v - %v", writer.Code, writer.Body.String())
 	}
+	if err := CleanUp(); err != nil {
+		test.Error(err)
+	}
 }
 
 func TestDeleteFile(test *testing.T) {
-	err := SetUp()
-	if err != nil {
+	if err := SetUp(); err != nil {
 		test.Fatalf("Setup failed with error: %v", err.Error())
 	}
 
-	_, err = os.Create("./stl/test.stl")
-	if err != nil {
+	if _, err := os.Create("./stl/test.stl"); err != nil {
 		test.Errorf("Failed to creat test stl file: %v", err)
 	}
 	request, _ := http.NewRequest("DELETE", "", nil)
 	writer := httptest.NewRecorder()
 	_getVars := getVars
-	getVars = func(_ *http.Request) map[string]string{
-		return map[string]string {
+	revert := func() {
+		getVars = _getVars
+	}
+	defer revert()
+	getVars = func(_ *http.Request) map[string]string {
+		return map[string]string{
 			"type": "stl",
 			"name": "test.stl",
 		}
@@ -67,14 +74,13 @@ func TestDeleteFile(test *testing.T) {
 		test.Error("STL file was not deleted")
 	}
 
-	_, err = os.Create("./gcode/test.gcode")
-	if err != nil {
+	if _, err := os.Create("./gcode/test.gcode"); err != nil {
 		test.Errorf("Failed to creat test gcode file: %v", err)
 	}
 	request, _ = http.NewRequest("DELETE", "", nil)
 	writer = httptest.NewRecorder()
-	getVars = func(_ *http.Request) map[string]string{
-		return map[string]string {
+	getVars = func(_ *http.Request) map[string]string {
+		return map[string]string{
 			"type": "gcode",
 			"name": "test.gcode",
 		}
@@ -86,21 +92,20 @@ func TestDeleteFile(test *testing.T) {
 	if _, err := os.Stat("./gcode/test.gcode"); err == nil {
 		test.Error("Gcode file was not deleted")
 	}
-	getVars = _getVars
+	if err := CleanUp(); err != nil {
+		test.Error(err)
+	}
 }
 
 func TestClearFiles(test *testing.T) {
-	err := SetUp()
-	if err != nil {
+	if err := SetUp(); err != nil {
 		test.Fatalf("Setup failed with error: %v", err.Error())
 	}
 
-	_, err = os.Create("./stl/test.stl")
-	if err != nil {
+	if _, err := os.Create("./stl/test.stl"); err != nil {
 		test.Errorf("Failed to creat test stl file: %v", err)
 	}
-	_, err = os.Create("./stl/test2.stl")
-	if err != nil {
+	if _, err := os.Create("./stl/test2.stl"); err != nil {
 		test.Errorf("Failed to creat test stl file: %v", err)
 	}
 	request, _ := http.NewRequest("DELETE", "/stl", nil)
@@ -116,12 +121,10 @@ func TestClearFiles(test *testing.T) {
 		test.Error("STL file was not deleted")
 	}
 
-	_, err = os.Create("./gcode/test.gcode")
-	if err != nil {
+	if _, err := os.Create("./gcode/test.gcode"); err != nil {
 		test.Errorf("Failed to creat test gcode file: %v", err)
 	}
-	_, err = os.Create("./gcode/test2.gcode")
-	if err != nil {
+	if _, err := os.Create("./gcode/test2.gcode"); err != nil {
 		test.Errorf("Failed to creat test gcode file: %v", err)
 	}
 	request, _ = http.NewRequest("DELETE", "/gcode", nil)
@@ -136,7 +139,9 @@ func TestClearFiles(test *testing.T) {
 	if _, err := os.Stat("./gcode/test2.gcode"); err == nil {
 		test.Error("Gcode file was not deleted")
 	}
-	err = os.Remove("stl")
+	if err := CleanUp(); err != nil {
+		test.Error(err)
+	}
 }
 
 func TestSlicerFile(test *testing.T) {
@@ -144,35 +149,40 @@ func TestSlicerFile(test *testing.T) {
 		sync.Mutex
 		code int
 		body string
-
 	}
-	err := SetUp()
-	if err != nil {
+
+	if err := SetUp(); err != nil {
 		test.Fatalf("Setup failed with error: %v", err.Error())
 	}
 
-	_, err = os.Create("./stl/test.stl")
-	if err != nil {
-		test.Errorf("Failed to creat test stl file: %v", err)
+	tests := [...]map[string]string{
+		map[string]string{},
+		map[string]string{
+			"wait": "true",
+		},
 	}
-	formData := map[string]string{
-		//"wait": "true",
+
+	for _,formData := range tests {
+		request, err := newFileUploadRequest("/slice", formData, "file", "cube.stl")
+		if err != nil {
+			test.Errorf("Failed to creat multipart request: %v", err.Error())
+		}
+		writer := httptest.NewRecorder()
+		sliceHandler(writer, request)
+		time.Sleep(1 * time.Second)
+		if writer.Code != http.StatusOK {
+			test.Errorf("File list didn't return OK, returned: %v - %v", writer.Code, writer.Body.String())
+		}
+		if _, err := os.Stat("stl/cube.stl"); os.IsNotExist(err) {
+			test.Error("STL file wasn't uploaded")
+		}
+		if _, err := os.Stat("gcode/cube.gcode"); os.IsNotExist(err) {
+			test.Error("Gcode file wasn't created")
+		}
 	}
-	request, err := newFileUploadRequest("/slice", formData, "file", "cube.stl")
-	if err != nil {
-		test.Errorf("Failed to creat multipart request: %v", err.Error())
-	}
-	writer := httptest.NewRecorder()
-	sliceHandler(writer, request)
-	time.Sleep(1 * time.Second)
-	if writer.Code != http.StatusOK {
-		test.Errorf("File list didn't return OK, returned: %v - %v", writer.Code, writer.Body.String())
-	}
-	if _, err := os.Stat("stl/cube.stl"); os.IsNotExist(err) {
-		test.Error("STL file wasn't uploaded")
-	}
-	if _, err := os.Stat("gcode/cube.gcode"); os.IsNotExist(err) {
-		test.Error("Gcode file wasn't created")
+
+	if err := CleanUp(); err != nil {
+		test.Error(err)
 	}
 }
 
@@ -205,4 +215,33 @@ func newFileUploadRequest(uri string, params map[string]string, paramName, path 
 	}
 	request.Header.Set("Content-Type", writer.FormDataContentType())
 	return request, nil
+}
+
+func CleanUp() error {
+	if err := RemoveContents("stl"); err != nil {
+		return errors.New("Fail to clear STL folder:" + err.Error())
+	}
+	if err := RemoveContents("gcode"); err != nil {
+		return errors.New("Fail to clear Gcode folder:" + err.Error())
+	}
+	return nil
+}
+
+func RemoveContents(dir string) error {
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	names, err := d.Readdirnames(-1)
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		err = os.RemoveAll(filepath.Join(dir, name))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
