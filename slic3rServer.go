@@ -174,7 +174,11 @@ func sliceHandler(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 	//Get form data
-	request.ParseMultipartForm(32 << 20)
+	err := request.ParseMultipartForm(32 << 20)
+	if err != nil {
+		http.Error(writer, "Failed to parse multipart form", 500)
+		return
+	}
 	var otherArgs, callbackType, callbackURL string
 	var wait bool
 	for key, value := range request.Form {
