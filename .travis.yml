@@ -11,3 +11,5 @@ before_install:
   
 install:
   - go get github.com/gorilla/mux
+
+gobuild_args: -v -debug
