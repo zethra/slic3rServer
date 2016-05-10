@@ -4,8 +4,13 @@ import (
 	"testing"
 	"net/http"
 	"net/http/httptest"
-	//"encoding/json"
 	"os"
+	"sync"
+	"mime/multipart"
+	"bytes"
+	"path/filepath"
+	"io"
+	"time"
 )
 
 func TestSetUp(t *testing.T)  {
@@ -24,22 +29,15 @@ func TestFileList(test *testing.T) {
 	writer := httptest.NewRecorder()
 	fileListHandler(writer, request)
 	if writer.Code != http.StatusOK {
-		test.Errorf("File list didn't return OK, returned: %v", writer.Code)
+		test.Errorf("File list didn't return OK, returned: %v - %v", writer.Code, writer.Body.String())
 	}
-	/*var fileList []string
-	if err = json.Unmarshal(writer.Body.Bytes(), fileList); err != nil {
-		test.Errorf("File list didn't return valid json, returned: %v", writer.Body.String())
-	}*/
 
 	request, _ = http.NewRequest("GET", "/gcode", nil)
 	writer = httptest.NewRecorder()
 	fileListHandler(writer, request)
 	if writer.Code != http.StatusOK {
-		test.Errorf("File list didn't return OK, returned: %v", writer.Code)
+		test.Errorf("File list didn't return OK, returned: %v - %v", writer.Code, writer.Body.String())
 	}
-	/*if err = json.Unmarshal(writer.Body.Bytes(), fileList); err != nil {
-		test.Errorf("File list didn't return valid json, returned: %v", writer.Body.String())
-	}*/
 }
 
 func TestDeleteFile(test *testing.T) {
@@ -63,7 +61,7 @@ func TestDeleteFile(test *testing.T) {
 	}
 	deleteFileHandler(writer, request)
 	if writer.Code != http.StatusNoContent {
-		test.Errorf("File list didn't return NoContent, returned: %v", writer.Code)
+		test.Errorf("File list didn't return NoContent, returned: %v - %v", writer.Code, writer.Body.String())
 	}
 	if _, err := os.Stat("./stl/test.stl"); err == nil {
 		test.Error("STL file was not deleted")
@@ -83,7 +81,7 @@ func TestDeleteFile(test *testing.T) {
 	}
 	deleteFileHandler(writer, request)
 	if writer.Code != http.StatusNoContent {
-		test.Errorf("File list didn't return NoContent, returned: %v", writer.Code)
+		test.Errorf("File list didn't return NoContent, returned: %v - %v", writer.Code, writer.Body.String())
 	}
 	if _, err := os.Stat("./gcode/test.gcode"); err == nil {
 		test.Error("Gcode file was not deleted")
@@ -109,7 +107,7 @@ func TestClearFiles(test *testing.T) {
 	writer := httptest.NewRecorder()
 	clearFilesHandler(writer, request)
 	if writer.Code != http.StatusNoContent {
-		test.Errorf("File list didn't return NoContent, returned: %v", writer.Code)
+		test.Errorf("File list didn't return NoContent, returned: %v - %v", writer.Code, writer.Body.String())
 	}
 	if _, err := os.Stat("./stl/test.stl"); err == nil {
 		test.Error("STL file was not deleted")
@@ -130,7 +128,7 @@ func TestClearFiles(test *testing.T) {
 	writer = httptest.NewRecorder()
 	clearFilesHandler(writer, request)
 	if writer.Code != http.StatusNoContent {
-		test.Errorf("File list didn't return NoContent, returned: %v", writer.Code)
+		test.Errorf("File list didn't return NoContent, returned: %v - %v", writer.Code, writer.Body.String())
 	}
 	if _, err := os.Stat("./gcode/test.gcode"); err == nil {
 		test.Error("Gcode file was not deleted")
@@ -138,4 +136,73 @@ func TestClearFiles(test *testing.T) {
 	if _, err := os.Stat("./gcode/test2.gcode"); err == nil {
 		test.Error("Gcode file was not deleted")
 	}
+	err = os.Remove("stl")
+}
+
+func TestSlicerFile(test *testing.T) {
+	type CallbackHandler struct {
+		sync.Mutex
+		code int
+		body string
+
+	}
+	err := SetUp()
+	if err != nil {
+		test.Fatalf("Setup failed with error: %v", err.Error())
+	}
+
+	_, err = os.Create("./stl/test.stl")
+	if err != nil {
+		test.Errorf("Failed to creat test stl file: %v", err)
+	}
+	formData := map[string]string{
+		//"wait": "true",
+	}
+	request, err := newFileUploadRequest("/slice", formData, "file", "cube.stl")
+	if err != nil {
+		test.Errorf("Failed to creat multipart request: %v", err.Error())
+	}
+	writer := httptest.NewRecorder()
+	sliceHandler(writer, request)
+	time.Sleep(1 * time.Second)
+	if writer.Code != http.StatusOK {
+		test.Errorf("File list didn't return OK, returned: %v - %v", writer.Code, writer.Body.String())
+	}
+	if _, err := os.Stat("stl/cube.stl"); os.IsNotExist(err) {
+		test.Error("STL file wasn't uploaded")
+	}
+	if _, err := os.Stat("gcode/cube.gcode"); os.IsNotExist(err) {
+		test.Error("Gcode file wasn't created")
+	}
+}
+
+func newFileUploadRequest(uri string, params map[string]string, paramName, path string) (*http.Request, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile(paramName, filepath.Base(path))
+	if err != nil {
+		return nil, err
+	}
+	_, err = io.Copy(part, file)
+
+	for key, val := range params {
+		_ = writer.WriteField(key, val)
+	}
+	err = writer.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	request, err := http.NewRequest("POST", uri, body)
+	if err != nil {
+		return nil, err
+	}
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	return request, nil
 }
