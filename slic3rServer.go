@@ -246,6 +246,9 @@ func sliceHandler(writer http.ResponseWriter, request *http.Request) {
 	}
 	//Run callback
 	if (callbackType == "url" && callbackURL != "") {
+		if (*debugFlag) {
+			log.Println("Sending URL callback")
+		}
 		wg.Wait()
 		req, err := http.NewRequest("POST", callbackURL, bytes.NewBuffer([]byte(gcodeFile)))
 		if (err != nil) {
@@ -268,6 +271,9 @@ func sliceHandler(writer http.ResponseWriter, request *http.Request) {
 			writer.Write([]byte(gcodeFile))
 		}
 	} else if (callbackType == "file" && callbackURL != "") {
+		if (*debugFlag) {
+			log.Println("Sending file callback")
+		}
 		wg.Wait()
 		file, err := os.Open(gcodeFile[1:len(gcodeFile)])
 		if (err != nil) {

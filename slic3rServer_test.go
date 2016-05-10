@@ -12,6 +12,7 @@ import (
 	"io"
 	"time"
 	"errors"
+	"io/ioutil"
 )
 
 func TestSetUp(test *testing.T) {
@@ -40,6 +41,7 @@ func TestFileList(test *testing.T) {
 	if writer.Code != http.StatusOK {
 		test.Errorf("File list didn't return OK, returned: %v - %v", writer.Code, writer.Body.String())
 	}
+	test.Logf("Recieved: %v", writer.Body)
 	if err := CleanUp(); err != nil {
 		test.Error(err)
 	}
@@ -144,26 +146,119 @@ func TestClearFiles(test *testing.T) {
 	}
 }
 
-func TestSlicerFile(test *testing.T) {
-	type CallbackHandler struct {
-		sync.Mutex
-		code int
-		body string
-	}
+type CallBackRequest struct {
+	formData map[string]string
+	callBackType string
+}
 
+type CallbackHandler struct {
+	sync.Mutex
+	callBackType string
+	test *testing.T
+}
+
+func (handler *CallbackHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	if request.Method != "POST" {
+		http.Error(writer, "Request is not a POST request", 400)
+		return
+	}
+	handler.Lock()
+	defer handler.Unlock()
+	if handler.callBackType == "url" {
+		body, err := ioutil.ReadAll(request.Body)
+		if err != nil {
+			http.Error(writer, "Could not read call back reuqest body", http.StatusInternalServerError)
+			handler.test.Error("Could not read call back reuqest body")
+		}
+		if _, err := os.Stat("." + string(body)); err == nil {
+			writer.WriteHeader(http.StatusOK)
+			handler.test.Log("URL callback recieved")
+		} else {
+			http.Error(writer, "Gcode file was not created", http.StatusInternalServerError)
+			handler.test.Error("Gcode file was not created")
+		}
+	} else if handler.callBackType == "file" {
+		if err := request.ParseMultipartForm(32 << 20); err != nil {
+			http.Error(writer, "Failed to parse callback multipart form", 500)
+			handler.test.Error("Failed to parse callback multipart form")
+		}
+		_, header, err := request.FormFile("file")
+		if err != nil {
+			http.Error(writer, "Could not parse file form callback", 400)
+			handler.test.Error("Could not parse file form callback")
+		}
+		if _, err := os.Stat("gcode/" + header.Filename); err == nil {
+			writer.WriteHeader(http.StatusOK)
+			handler.test.Log("file callback recieved")
+		} else {
+			http.Error(writer, "Gcode file was not created", http.StatusInternalServerError)
+			handler.test.Error("Gcode file was not created")
+		}
+	}
+}
+
+func TestServerTest(test *testing.T) {
+	if err := SetUp(); err != nil {
+		test.Fatalf("Setup failed with error: %v", err.Error())
+	}
+	handler := &CallbackHandler{callBackType:"url"}
+	server := httptest.NewServer(handler)
+	defer server.Close()
+}
+
+func TestSlicerFile(test *testing.T) {
 	if err := SetUp(); err != nil {
 		test.Fatalf("Setup failed with error: %v", err.Error())
 	}
 
-	tests := [...]map[string]string{
-		map[string]string{},
-		map[string]string{
-			"wait": "true",
+	handler := &CallbackHandler{test: test}
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	tests := [...]CallBackRequest{
+		CallBackRequest{
+			formData: map[string]string{},
+			callBackType: "",
+		},
+		CallBackRequest{
+			formData: map[string]string{
+				"wait": "true",
+			},
+			callBackType: "",
+		},
+		CallBackRequest{
+			formData: map[string]string{
+				"callback": "url," + server.URL,
+			},
+			callBackType: "url",
+		},
+		CallBackRequest{
+			formData: map[string]string{
+				"callback": "file," + server.URL,
+			},
+			callBackType: "file",
+		},
+		CallBackRequest{
+			formData: map[string]string{
+				"callback": "url," + server.URL,
+				"wait": "true",
+			},
+			callBackType: "url",
+		},
+		CallBackRequest{
+			formData: map[string]string{
+				"callback": "file," + server.URL,
+				"wait": "true",
+			},
+			callBackType: "file",
 		},
 	}
 
-	for _,formData := range tests {
-		request, err := newFileUploadRequest("/slice", formData, "file", "cube.stl")
+	for _,callBackRequest := range tests {
+		if callBackRequest.callBackType != "" {
+			handler.callBackType = callBackRequest.callBackType
+		}
+		request, err := newFileUploadRequest("/slice", callBackRequest.formData, "file", "cube.stl")
 		if err != nil {
 			test.Errorf("Failed to creat multipart request: %v", err.Error())
 		}
