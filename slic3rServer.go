@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 	"io"
-	"sync"
 	"strings"
 	"os/exec"
 	"fmt"
@@ -46,7 +45,7 @@ func main() {
 	http.ListenAndServe(fmt.Sprintf(":%d", config.Port), nil)
 }
 
-func SetUp() error{
+func SetUp() error {
 	//Generate Directories
 	if _, err := os.Stat("stl"); os.IsNotExist(err) {
 		if (*debugFlag) {
@@ -98,7 +97,7 @@ func SetUp() error{
 	return nil
 }
 
-func NewServer() *mux.Router{
+func NewServer() *mux.Router {
 	//Start HTTP server
 	router := mux.NewRouter()
 	router.HandleFunc("/slice", sliceHandler).Methods("POST")
@@ -184,6 +183,10 @@ func sliceHandler(writer http.ResponseWriter, request *http.Request) {
 	for key, value := range request.Form {
 		if key == "callback" && len(value) > 0 {
 			tmp := strings.Split(value[0], ",")
+			if len(tmp) != 2 {
+				http.Error(writer, "Invalid callback", 400)
+				return
+			}
 			callbackType = tmp[0]
 			callbackURL = tmp[1]
 		} else if key == "wait" && len(value) > 0 {
@@ -233,42 +236,42 @@ func sliceHandler(writer http.ResponseWriter, request *http.Request) {
 	file.Close()
 	//Run slic3r with STL file and args
 	args := fmt.Sprintf(" stl/%s.stl %s --output gcode/%s.gcode", fileName, otherArgs, fileName)
-	wg := new(sync.WaitGroup)
-	wg.Add(1)
-	ec := make(chan error)
-	go exe_cmd(config.Slic3rPath + args, wg ,ec)
+	done := make(chan error)
+	go exe_cmd(config.Slic3rPath + args, done)
 	gcodeFile := "/gcode/" + fileName + ".gcode"
 	//Wait if needed
 	if (!wait) {
 		writer.Write([]byte(gcodeFile))
 	}else if (wait && callbackType == "") {
-		wg.Wait()
-		if err = <- ec; err != nil {
+		if err = <-done; err != nil {
 			http.Error(writer, "Slicing failed", 500)
 			return
 		}
+		close(done)
 		writer.Write([]byte(gcodeFile))
+		return
 	}
 	//Run callback
 	if (callbackType == "url" && callbackURL != "") {
 		if (*debugFlag) {
 			log.Println("Sending URL callback")
 		}
-		wg.Wait()
 		req, err := http.NewRequest("POST", callbackURL, bytes.NewBuffer([]byte(gcodeFile)))
 		if err != nil {
 			log.Println(err)
 			if (wait) {
 				http.Error(writer, "Callback could not be completed", 500)
 			}
+			close(done)
 			return
 		}
-		if err = <- ec; err != nil {
+		if err = <-done; err != nil {
 			req.Header.Add("error", "true")
 			if (wait) {
 				http.Error(writer, "Slciing Failed", 500)
 			}
 		}
+		close(done)
 		client := &http.Client{}
 		_, err = client.Do(req)
 		if (err != nil) {
@@ -285,7 +288,6 @@ func sliceHandler(writer http.ResponseWriter, request *http.Request) {
 		if (*debugFlag) {
 			log.Println("Sending file callback")
 		}
-		wg.Wait()
 		body := &bytes.Buffer{}
 		mpWriter := multipart.NewWriter(body)
 		req, err := http.NewRequest("POST", callbackURL, body)
@@ -296,7 +298,7 @@ func sliceHandler(writer http.ResponseWriter, request *http.Request) {
 			}
 			return
 		}
-		if err = <- ec; err != nil {
+		if err = <-done; err != nil {
 			req.Header.Add("error", "true")
 			if (wait) {
 				http.Error(writer, "Slciing Failed", 500)
@@ -336,6 +338,7 @@ func sliceHandler(writer http.ResponseWriter, request *http.Request) {
 				return
 			}
 		}
+		close(done)
 		req.Header.Set("Content-Type", mpWriter.FormDataContentType())
 		client := &http.Client{}
 		_, err = client.Do(req)
@@ -352,7 +355,7 @@ func sliceHandler(writer http.ResponseWriter, request *http.Request) {
 	}
 }
 
-func exe_cmd(cmd string, wg *sync.WaitGroup, errorChan chan error) {
+func exe_cmd(cmd string, done chan error) {
 	if (*debugFlag) {
 		log.Println("executing: ", cmd)
 	}
@@ -363,13 +366,12 @@ func exe_cmd(cmd string, wg *sync.WaitGroup, errorChan chan error) {
 	out, err := exec.Command(head, parts...).Output()
 	if err != nil {
 		log.Printf("%s\n", err)
-		errorChan <- err
+
 	}
 	if (*debugFlag) {
 		log.Printf("%s\n", out)
-		errorChan <- nil
 	}
-	wg.Done()
+	done <- err
 }
 
 var getVars = func(request *http.Request) map[string]string {

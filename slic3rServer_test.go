@@ -41,7 +41,7 @@ func TestFileList(test *testing.T) {
 	if writer.Code != http.StatusOK {
 		test.Errorf("File list didn't return OK, returned: %v - %v", writer.Code, writer.Body.String())
 	}
-	test.Logf("Recieved: %v", writer.Body)
+	test.Logf("Recieved: %v\n", writer.Body)
 	if err := CleanUp(); err != nil {
 		test.Error(err)
 	}
