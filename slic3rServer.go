@@ -243,7 +243,7 @@ func sliceHandler(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte(gcodeFile))
 	}else if (wait && callbackType == "") {
 		wg.Wait()
-		if err <- ec; err != nil {
+		if err = <- ec; err != nil {
 			http.Error(writer, "Slicing failed", 500)
 			return
 		}
@@ -263,7 +263,7 @@ func sliceHandler(writer http.ResponseWriter, request *http.Request) {
 			}
 			return
 		}
-		if err <- ec; err != nil {
+		if err = <- ec; err != nil {
 			req.Header.Add("error", "true")
 			if (wait) {
 				http.Error(writer, "Slciing Failed", 500)
@@ -296,7 +296,7 @@ func sliceHandler(writer http.ResponseWriter, request *http.Request) {
 			}
 			return
 		}
-		if err <- ec; err != nil {
+		if err = <- ec; err != nil {
 			req.Header.Add("error", "true")
 			if (wait) {
 				http.Error(writer, "Slciing Failed", 500)
