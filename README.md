@@ -57,6 +57,15 @@ url,http://localhost:8080/callback
 </pre>
 Resulting command `slic3r stl/test.stl --repair --layer-height 0.2 --output gcode/test.gcode`
 
+#### Response
+ - Slic3r Server will respond with the url the goce file will be available at when slic3r is done
+ - Slic3r Server may return a 500 error if something goes wrong.  Check the log for specifics
+
+#### Callback
+ - The URL callback body will contain the url of the gcode file
+ - The file callback will be a multipart request with the file parameter containing the gcode file
+ - Both types may have the parameter `error` set to `true` if slicing failed or something went wrong
+
 ### Get a list of files on the server
 Send a GET request to /stl or /gcode
 

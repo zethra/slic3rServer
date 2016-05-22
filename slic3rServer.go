@@ -235,13 +235,18 @@ func sliceHandler(writer http.ResponseWriter, request *http.Request) {
 	args := fmt.Sprintf(" stl/%s.stl %s --output gcode/%s.gcode", fileName, otherArgs, fileName)
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
-	go exe_cmd(config.Slic3rPath + args, wg)
+	ec := make(chan error)
+	go exe_cmd(config.Slic3rPath + args, wg ,ec)
 	gcodeFile := "/gcode/" + fileName + ".gcode"
 	//Wait if needed
 	if (!wait) {
 		writer.Write([]byte(gcodeFile))
-	}else if (wait && callbackURL == "") {
+	}else if (wait && callbackType == "") {
 		wg.Wait()
+		if err <- ec; err != nil {
+			http.Error(writer, "Slicing failed", 500)
+			return
+		}
 		writer.Write([]byte(gcodeFile))
 	}
 	//Run callback
@@ -251,12 +256,18 @@ func sliceHandler(writer http.ResponseWriter, request *http.Request) {
 		}
 		wg.Wait()
 		req, err := http.NewRequest("POST", callbackURL, bytes.NewBuffer([]byte(gcodeFile)))
-		if (err != nil) {
+		if err != nil {
 			log.Println(err)
 			if (wait) {
 				http.Error(writer, "Callback could not be completed", 500)
 			}
 			return
+		}
+		if err <- ec; err != nil {
+			req.Header.Add("error", "true")
+			if (wait) {
+				http.Error(writer, "Slciing Failed", 500)
+			}
 		}
 		client := &http.Client{}
 		_, err = client.Do(req)
@@ -275,41 +286,8 @@ func sliceHandler(writer http.ResponseWriter, request *http.Request) {
 			log.Println("Sending file callback")
 		}
 		wg.Wait()
-		file, err := os.Open(gcodeFile[1:len(gcodeFile)])
-		if (err != nil) {
-			log.Println(err)
-			if (wait) {
-				http.Error(writer, "Callback could not be completed", 500)
-			}
-			return
-		}
-		defer file.Close()
 		body := &bytes.Buffer{}
 		mpWriter := multipart.NewWriter(body)
-		part, err := mpWriter.CreateFormFile("file", filepath.Base(gcodeFile[1:len(gcodeFile)]))
-		if (err != nil) {
-			log.Println(err)
-			if (wait) {
-				http.Error(writer, "Callback could not be completed", 500)
-			}
-			return
-		}
-		_, err = io.Copy(part, file)
-		if (err != nil) {
-			log.Println(err)
-			if (wait) {
-				http.Error(writer, "Callback could not be completed", 500)
-			}
-			return
-		}
-		err = mpWriter.Close()
-		if (err != nil) {
-			log.Println(err)
-			if (wait) {
-				http.Error(writer, "Callback could not be completed", 500)
-			}
-			return
-		}
 		req, err := http.NewRequest("POST", callbackURL, body)
 		if (err != nil) {
 			log.Println(err)
@@ -317,6 +295,46 @@ func sliceHandler(writer http.ResponseWriter, request *http.Request) {
 				http.Error(writer, "Callback could not be completed", 500)
 			}
 			return
+		}
+		if err <- ec; err != nil {
+			req.Header.Add("error", "true")
+			if (wait) {
+				http.Error(writer, "Slciing Failed", 500)
+			}
+		} else {
+			file, err := os.Open(gcodeFile[1:len(gcodeFile)])
+			if (err != nil) {
+				log.Println(err)
+				if (wait) {
+					http.Error(writer, "Callback could not be completed", 500)
+				}
+				return
+			}
+			defer file.Close()
+			part, err := mpWriter.CreateFormFile("file", filepath.Base(gcodeFile[1:len(gcodeFile)]))
+			if (err != nil) {
+				log.Println(err)
+				if (wait) {
+					http.Error(writer, "Callback could not be completed", 500)
+				}
+				return
+			}
+			_, err = io.Copy(part, file)
+			if (err != nil) {
+				log.Println(err)
+				if (wait) {
+					http.Error(writer, "Callback could not be completed", 500)
+				}
+				return
+			}
+			err = mpWriter.Close()
+			if (err != nil) {
+				log.Println(err)
+				if (wait) {
+					http.Error(writer, "Callback could not be completed", 500)
+				}
+				return
+			}
 		}
 		req.Header.Set("Content-Type", mpWriter.FormDataContentType())
 		client := &http.Client{}
@@ -334,7 +352,7 @@ func sliceHandler(writer http.ResponseWriter, request *http.Request) {
 	}
 }
 
-func exe_cmd(cmd string, wg *sync.WaitGroup) {
+func exe_cmd(cmd string, wg *sync.WaitGroup, errorChan chan error) {
 	if (*debugFlag) {
 		log.Println("executing: ", cmd)
 	}
@@ -345,9 +363,11 @@ func exe_cmd(cmd string, wg *sync.WaitGroup) {
 	out, err := exec.Command(head, parts...).Output()
 	if err != nil {
 		log.Printf("%s\n", err)
+		errorChan <- err
 	}
 	if (*debugFlag) {
 		log.Printf("%s\n", out)
+		errorChan <- nil
 	}
 	wg.Done()
 }
