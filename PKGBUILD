@@ -1,4 +1,6 @@
-pkgname=slic3rServer
+# Maintainer: Ben Goldberg <jediben97@gmail.com>
+
+pkgname=slic3r-server
 pkgver=0.1.0_alpha
 pkgrel=1
 pkgdesc="A small program to control the slicing program Slic3r with a RESTful API"
