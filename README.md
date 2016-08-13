@@ -2,6 +2,10 @@
 This is and RESTful api for [Slic3r](http://slic3r.org)
 
 ## Install
+### ARCH
+ - An AUR package is avalible here: [AUR](https://aur.archlinux.org/packages/slic3r-server/)
+
+### Manual
  - Install the [go compiler](http://golang.org) and set up the go environment
  - Run `go get github.com/zethra/slic3rServer`
  - Run `slic3rServer` binary
